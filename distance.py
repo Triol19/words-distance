@@ -1,19 +1,13 @@
 import re
 import argparse
-from typing import List, Tuple
-
-# words = ['a', 'x', 'x', 'x', 'b']
-# words = ['b', 'x', 'x', 'x', 'a']
-# words = ['a', 'x', 'x', 'x', 'a', 'b']
-# words = ['b', 'x', 'x', 'x', 'b', 'a']
-# words = ['a', 'x', 'x', 'x', 'b', 'x', 'a']
-# words = ['b', 'x', 'x', 'x', 'a', 'x', 'b']
-# words = ['a', 'x', 'x', 'x', 'b', 'x', 'b', 'x', 'b', 'a', 'a']
-# words = ['b', 'x', 'x', 'x', 'a', 'x', 'a', 'x', 'a', 'b', 'b']
+from typing import List, Tuple, Optional
 
 
-def prepare_line_words(line: str) -> List[str]:
-    return re.sub(r'\s+', ' ', re.sub(r'[^\w\s]', '', line)).strip().split(' ')
+def prepare_line_words(line: str, ci: bool) -> List[str]:
+    new_line = re.sub(r'\s+', ' ', re.sub(r'[^\w\s]', '', line))
+    if ci:
+        new_line = new_line.lower()
+    return new_line.strip().split(' ')
 
 
 def calc_abs_current_index(
@@ -42,7 +36,13 @@ def recalculate_indexes(
     return this_word, another_word, this_word_last_occur
 
 
-def find_distance(first_word: str, second_word: str, filename: str) -> None:
+def find_distance(
+    first_word: str, second_word: str,
+    filename: str = 'file_to_process.txt', ci: bool = False
+) -> Optional[int]:
+    if ci:
+        first_word = first_word.lower()
+        second_word = second_word.lower()
     first_word_was_last = True
     first_distance_word_index = None
     second_distance_word_index = None
@@ -52,7 +52,7 @@ def find_distance(first_word: str, second_word: str, filename: str) -> None:
     file_last_line_index = 0
     with open(filename) as f:
         for line in f:
-            words = prepare_line_words(line)
+            words = prepare_line_words(line, ci)
             for index, word in enumerate(words):
                 abs_index = calc_abs_current_index(file_last_line_index, index)
                 if word == first_word:
@@ -84,8 +84,18 @@ def find_distance(first_word: str, second_word: str, filename: str) -> None:
                     )
                     first_word_was_last = False
             file_last_line_index += len(words)
-            # TODO: check on distance == 0 to break
-    print(abs(second_distance_word_index - first_distance_word_index) - 1)
+            if (
+                first_distance_word_index and
+                second_distance_word_index and
+                not abs(second_distance_word_index - first_distance_word_index)
+            ):
+                break
+    if first_distance_word_index is None:
+        print('Word "{}" was not found'.format(first_word))
+    if second_distance_word_index is None:
+        print('Word "{}" was not found'.format(second_word))
+    if first_distance_word_index is not None and second_distance_word_index is not None:
+        return abs(second_distance_word_index - first_distance_word_index) - 1
 
 
 def main():
@@ -93,12 +103,20 @@ def main():
     parser.add_argument(
         '-f', '--file', help='File to process', default='file_to_process.txt'
     )
+    parser.add_argument(
+        '-ci', '--case_insensitive', type=bool, help='Either case insensitive', default=False
+    )
     parser.add_argument('-w1', '--word1', help='First word', required=True)
     parser.add_argument('-w2', '--word2', help='Second word', required=True)
     args = parser.parse_args()
     assert args.word1 != args.word2, 'Don\'t try to find distance between the same words'
 
-    find_distance(args.word1, args.word2, args.file)
+    distance = find_distance(
+        args.word1, args.word2, args.file, args.case_insensitive
+    )
+
+    if distance is not None:
+        print('The shortest distance is {}'.format(distance))
 
 
 if __name__ == '__main__':
